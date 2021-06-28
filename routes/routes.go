@@ -2,11 +2,10 @@ package routes
 
 import (
 	"gin-web/contextPlus"
+	"gin-web/kernel"
 	"github.com/gin-gonic/gin"
 	"sync"
 )
-
-var r *gin.Engine
 
 const (
 	GET    int = 0x000000
@@ -20,7 +19,18 @@ type router struct {
 }
 
 type group struct {
-	group *gin.RouterGroup
+	engine      *gin.Engine
+	middlewares []contextPlus.HandlerFunc
+	path        string
+}
+
+type handler struct {
+	handlerFunc func(*contextPlus.Context) interface{}
+	middlewares []contextPlus.HandlerFunc
+	engine      *gin.Engine
+	url         string
+	method      int
+	regex       map[string]string //路由正则表达式
 }
 
 func newRouter(engine *gin.Engine) *router {
@@ -30,47 +40,31 @@ func newRouter(engine *gin.Engine) *router {
 	}
 }
 
-func (rr *router) Group(path string, callback func(group2 *group), middlewares ...contextPlus.HandlerFunc) {
-
-	var temp = make([]gin.HandlerFunc, len(middlewares))
-
-	for i, funcs := range middlewares {
-
-		temp[i] = func(context *gin.Context) {
-
-			funcs(&contextPlus.Context{Context: context, Lock: &sync.Mutex{}})
-
-		}
-
-	}
+func (rr *router) Group(path string, callback func(group2 group), middlewares ...contextPlus.HandlerFunc) {
 
 	g := group{
-		group: rr.engine.Group(path, temp...),
+		engine:      rr.engine,
+		middlewares: middlewares,
+		path:        path,
 	}
 
-	callback(&g)
+	callback(g)
 
 }
 
-func (gg *group) Group(path string, callback func(group2 *group), middlewares ...contextPlus.HandlerFunc) {
+func (gg group) Group(path string, callback func(group2 group), middlewares ...contextPlus.HandlerFunc) {
 
-	var temp = make([]gin.HandlerFunc, len(middlewares))
+	for _, funcs := range middlewares {
 
-	for i, funcs := range middlewares {
+		tempFuncs := funcs
 
-		temp[i] = func(context *gin.Context) {
-
-			funcs(&contextPlus.Context{Context: context, Lock: &sync.Mutex{}})
-
-		}
+		gg.middlewares = append(gg.middlewares, tempFuncs)
 
 	}
 
-	g := group{
-		group: gg.group.Group(path, temp...),
-	}
+	gg.path += path
 
-	callback(&g)
+	callback(gg)
 
 }
 
@@ -90,9 +84,11 @@ func (rr *router) Registered(method int, url string, f func(c *contextPlus.Conte
 
 	for i, funcs := range middlewares {
 
+		tempFuncs := funcs
+
 		temp[i] = func(context *gin.Context) {
 
-			funcs(&contextPlus.Context{Context: context, Lock: &sync.Mutex{}})
+			tempFuncs(&contextPlus.Context{Context: context, Lock: &sync.Mutex{}})
 
 		}
 
@@ -120,95 +116,85 @@ func (rr *router) Registered(method int, url string, f func(c *contextPlus.Conte
 
 }
 
-func (gg *group) Registered(method int, url string, f func(c *contextPlus.Context) interface{}, middlewares ...contextPlus.HandlerFunc) {
+func (gg group) Registered(method int, url string, f func(c *contextPlus.Context) interface{}, middlewares ...contextPlus.HandlerFunc) *handler {
 
-	ff := func(c *contextPlus.Context) {
+	for _, middleware := range middlewares {
 
-		data := f(c)
+		tempFuncs := middleware
 
-		getDataType(data, c)
-
+		gg.middlewares = append(gg.middlewares, tempFuncs)
 	}
 
-	middlewares = append(middlewares, ff)
-
-	var temp = make([]gin.HandlerFunc, len(middlewares))
-
-	for i, funcs := range middlewares {
-
-		temp[i] = func(context *gin.Context) {
-
-			funcs(&contextPlus.Context{Context: context, Lock: &sync.Mutex{}})
-
-		}
-
-	}
-
-	switch method {
-
-	case GET:
-
-		gg.group.GET(url, temp...)
-
-	case POST:
-
-		gg.group.POST(url, temp...)
-
-	case PUT:
-
-		gg.group.PUT(url, temp...)
-
-	case DELETE:
-
-		gg.group.DELETE(url, temp...)
-
+	return &handler{
+		handlerFunc: f,
+		engine:      gg.engine,
+		url:         gg.path + url,
+		method:      method,
+		middlewares: gg.middlewares,
 	}
 
 }
 
-//路由注册
-func actionRegistered(method int, url string, f func(c *contextPlus.Context) interface{}, middlewares ...contextPlus.HandlerFunc) {
+func (h *handler) Regex(reg map[string]string) *handler {
+
+	h.regex = reg
+
+	return h
+}
+
+func (h *handler) Bind() {
 
 	ff := func(c *contextPlus.Context) {
 
-		data := f(c)
+		data := h.handlerFunc(c)
 
 		getDataType(data, c)
 
 	}
 
-	middlewares = append(middlewares, ff)
+	h.middlewares = append(h.middlewares, ff)
 
-	var temp = make([]gin.HandlerFunc, len(middlewares))
+	var temp = make([]gin.HandlerFunc, len(h.middlewares))
 
-	for i, funcs := range middlewares {
+	for i, funcs := range h.middlewares {
+
+		tempFuncs := funcs
 
 		temp[i] = func(context *gin.Context) {
 
-			funcs(&contextPlus.Context{Context: context, Lock: &sync.Mutex{}})
+			tempFuncs(&contextPlus.Context{
+				Context: context,
+				Lock:    &sync.Mutex{},
+				Handler: &contextPlus.Handler{
+					HandlerFunc: h.handlerFunc,
+					Engine:      h.engine,
+					Url:         h.url,
+					Method:      h.method,
+					Regex:       h.regex,
+				},
+			})
 
 		}
 
 	}
 
-	switch method {
+	switch h.method {
 
 	case GET:
 
-		r.GET(url, temp...)
+		h.engine.GET(h.url, temp...)
 
 	case POST:
 
-		r.POST(url, temp...)
+		h.engine.POST(h.url, temp...)
 
 	case PUT:
 
-		r.PUT(url, temp...)
+		h.engine.PUT(h.url, temp...)
 
 	case DELETE:
 
-		r.DELETE(url, temp...)
-
+		h.engine.DELETE(h.url, temp...)
 	}
 
 }
@@ -224,10 +210,25 @@ func getDataType(data interface{}, c *contextPlus.Context) {
 	case string:
 
 		c.String(200, item)
+
+	case []byte:
+
+		c.String(200, string(item))
 	case gin.H:
 
-		//fmt.Println(1111)
 		c.JSON(200, item)
 
 	}
+}
+
+func Load(rr *gin.Engine) {
+
+	_r := newRouter(rr)
+
+	_r.Group("", func(global group) {
+
+		_init(global)
+
+	}, kernel.Middleware...)
+
 }

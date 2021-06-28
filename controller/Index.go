@@ -9,7 +9,11 @@ import (
 // Index 主页
 func Index(c *contextPlus.Context) interface{} {
 
-	//c.Session().
+	//fmt.Println(c.Jj)
+
+	//fmt.Println(c.Get("test"))
+
+	//panic("123")
 
 	return gin.H{"code": 1, "msg": "hello world"}
 }
@@ -29,4 +33,21 @@ func SessionSet(c *contextPlus.Context) interface{} {
 	}
 
 	return gin.H{"code": 1, "msg": "hello world"}
+}
+
+func Captcha(c *contextPlus.Context) interface{} {
+
+	b := c.GetCaptcha()
+
+	c.Header("content-type", "image/png")
+
+	return b
+}
+
+func CheckCaptcha(c *contextPlus.Context) interface{} {
+
+	code := c.Query("code")
+
+	return gin.H{"data": c.CheckCaptcha(code)}
+
 }
