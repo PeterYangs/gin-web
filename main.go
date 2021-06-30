@@ -3,6 +3,7 @@ package main
 import (
 	"gin-web/conf"
 	"gin-web/kernel"
+	"gin-web/queue"
 	"gin-web/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -43,6 +44,8 @@ func main() {
 	//
 	//	endless.ListenAndServe(":"+port, r)
 	//}
+
+	go queue.Run()
 
 	//windows只做开发测试
 	if sysType == "windows" {

@@ -77,3 +77,24 @@ func (cc *_connect) Set(cxt context.Context, key string, value interface{}, expi
 
 	return cc.connect.Set(cxt, conf.Get("redis_prefix").(string)+key, value, expiration)
 }
+
+func (cc *_connect) LPush(cxt context.Context, key string, value ...interface{}) *redis.IntCmd {
+
+	return cc.connect.LPush(cxt, conf.Get("redis_prefix").(string)+key, value)
+
+}
+
+func (cc *_connect) RPop(cxt context.Context, key string) *redis.StringCmd {
+
+	return cc.connect.RPop(cxt, conf.Get("redis_prefix").(string)+key)
+}
+
+func (cc *_connect) BRPop(cxt context.Context, timeout time.Duration, keys ...string) *redis.StringSliceCmd {
+
+	for i, key := range keys {
+
+		keys[i] = conf.Get("redis_prefix").(string) + key
+	}
+
+	return cc.connect.BRPop(cxt, timeout, keys...)
+}

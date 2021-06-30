@@ -3,6 +3,7 @@ package routes
 import (
 	"gin-web/controller"
 	"gin-web/controller/file"
+	"gin-web/controller/queue"
 	"gin-web/controller/regex"
 	"gin-web/middleware"
 	"gin-web/middleware/loginLimiter"
@@ -35,5 +36,8 @@ func _init(_r group) {
 	_r.Registered(POST, "/file", file.File).Bind()
 
 	_r.Registered(GET, "/regex/:name", regex.Regex).Bind()
+
+	//队列投递
+	_r.Registered(GET, "/task", queue.Task).Bind()
 
 }
