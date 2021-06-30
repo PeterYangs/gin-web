@@ -3,6 +3,7 @@ package migrate
 import (
 	"fmt"
 	"gin-web/database"
+	"gin-web/migrate/transaction"
 	"gin-web/model"
 	"github.com/PeterYangs/tools"
 	"github.com/joho/godotenv"
@@ -42,9 +43,10 @@ const (
 type Types string
 
 const (
-	Int    Types = "int"
-	String Types = "varchar"
-	Text   Types = "text"
+	Int       Types = "int"
+	String    Types = "varchar"
+	Text      Types = "text"
+	Timestamp Types = "timestamp"
 )
 
 func (t Types) ToString() string {
@@ -57,6 +59,7 @@ type Migrate struct {
 	Table  string
 	fields []*field
 	Name   string
+	unique [][]string //[ [name,title]  ]
 }
 
 type field struct {
@@ -69,6 +72,7 @@ type field struct {
 	tag          Tag
 	defaultValue interface{}
 	comment      string
+	unique       bool //唯一索引
 }
 
 // Create 创建表
@@ -118,6 +122,13 @@ func (c *Migrate) BigIncrements(column string) {
 	c.fields = append(c.fields, &field{column: column, isPrimaryKey: true})
 }
 
+// Unique 设置唯一索引
+func (c *Migrate) Unique(column ...string) {
+
+	c.unique = append(c.unique, column)
+
+}
+
 // Integer int
 func (c *Migrate) Integer(column string) *field {
 
@@ -141,6 +152,15 @@ func (c *Migrate) String(column string, length int) *field {
 func (c *Migrate) Text(column string) *field {
 
 	f := &field{column: column, types: String, tag: CREATE}
+
+	c.fields = append(c.fields, f)
+
+	return f
+}
+
+func (c *Migrate) Timestamp(column string) *field {
+
+	f := &field{column: column, types: Timestamp, tag: CREATE}
 
 	c.fields = append(c.fields, f)
 
@@ -175,6 +195,14 @@ func (f *field) Unsigned() *field {
 	return f
 }
 
+// Unique 唯一索引
+func (f *field) Unique() *field {
+
+	f.unique = true
+
+	return f
+}
+
 func (f *field) Nullable() *field {
 
 	f.isNullable = true
@@ -183,6 +211,11 @@ func (f *field) Nullable() *field {
 }
 
 func run(m *Migrate) {
+
+	if transaction.E != nil {
+
+		return
+	}
 
 	isFind := database.GetDb().Where("migration = ?", m.Name).First(&model.Migrations{})
 
@@ -202,7 +235,9 @@ func run(m *Migrate) {
 
 		sql := "CREATE TABLE `" + m.Table + "` (" +
 			"`" + getPrimaryKey(m) + "` int(10) unsigned NOT NULL AUTO_INCREMENT," +
+			setTableUnique(m) +
 			getColumn(m) +
+			setColumnUnique(m) +
 			"PRIMARY KEY (`" + getPrimaryKey(m) + "`)" +
 			") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
 
@@ -210,9 +245,11 @@ func run(m *Migrate) {
 
 		if t.Error != nil {
 
-			fmt.Println(t.Error)
-
+			//fmt.Println(t.Error)
+			//
 			fmt.Println(sql)
+
+			transaction.E = t.Error
 
 			return
 		}
@@ -255,6 +292,8 @@ func run(m *Migrate) {
 		if t.Error != nil {
 
 			fmt.Println(t.Error)
+
+			transaction.E = t.Error
 
 			return
 		}
@@ -311,6 +350,39 @@ func getColumn(m *Migrate) string {
 	return str
 }
 
+//设置字段唯一索引
+func setColumnUnique(m *Migrate) string {
+
+	str := ""
+
+	for _, f := range m.fields {
+
+		if f.unique {
+
+			str += " UNIQUE KEY `" + f.column + "` (`" + f.column + "`), "
+
+		}
+
+	}
+
+	return str
+
+}
+
+func setTableUnique(m *Migrate) string {
+
+	str := ""
+
+	for _, strings := range m.unique {
+
+		str += " UNIQUE KEY `" + tools.Join("+", strings) + "` (`" + tools.Join("`,`", strings) + "`)" + " USING BTREE, "
+
+	}
+
+	return str
+}
+
+//设置字段类型
 func setColumnAttr(f *field) string {
 
 	str := ""
@@ -319,13 +391,19 @@ func setColumnAttr(f *field) string {
 
 	case Text:
 
-		str += "`" + f.column + "` " + f.types.ToString() + " "
+		str += " `" + f.column + "` " + f.types.ToString() + " "
+
+		break
+
+	case Timestamp:
+
+		str += " `" + f.column + "` " + f.types.ToString() + " NULL "
 
 		break
 
 	default:
 
-		str += "`" + f.column + "` " + f.types.ToString() + "(" + cast.ToString(f.length) + ") "
+		str += " `" + f.column + "` " + f.types.ToString() + "(" + cast.ToString(f.length) + ") "
 
 	}
 
