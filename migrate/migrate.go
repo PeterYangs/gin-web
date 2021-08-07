@@ -251,8 +251,6 @@ func run(m *Migrate) {
 
 		if t.Error != nil {
 
-			//fmt.Println(t.Error)
-			//
 			fmt.Println(sql)
 
 			transaction.E = t.Error
@@ -268,6 +266,8 @@ func run(m *Migrate) {
 	}
 
 	if m.Tag == UPDATE {
+
+		fmt.Println("hi you")
 
 		sql := "alter table `" + m.Table + "` "
 
@@ -292,11 +292,26 @@ func run(m *Migrate) {
 
 		}
 
-		sql = tools.SubStr(sql, 0, len(sql)-1)
+		//索引添加
+		for i, strings := range m.unique {
+
+			if len(m.fields) > 0 {
+
+				sql += ","
+			}
+
+			sql += " add UNIQUE  `" + tools.Join("+", strings) + "` (`" + tools.Join("`,`", strings) + "`)" + " USING BTREE"
+
+			if i+1 < len(m.unique) {
+
+				sql += ","
+			}
+
+		}
+
+		fmt.Println(sql)
 
 		t := database.GetDb().Exec(sql)
-
-		//fmt.Println(t.Error)
 
 		if t.Error != nil {
 
