@@ -6,7 +6,6 @@ import (
 	"gin-web/controller/queue"
 	"gin-web/controller/regex"
 	"gin-web/middleware"
-	"gin-web/middleware/loginLimiter"
 )
 
 func _init(_r group) {
@@ -25,7 +24,7 @@ func _init(_r group) {
 	}, middleware.GoOn)
 
 	//单路由
-	_r.Registered(GET, "/", controller.Index, loginLimiter.LoginLimiter).Bind()
+	_r.Registered(GET, "/", controller.Index).Bind()
 	_r.Registered(GET, "/2", controller.Index2).Bind()
 
 	_r.Registered(GET, "/c", controller.Captcha).Bind()
@@ -36,6 +35,10 @@ func _init(_r group) {
 	_r.Registered(POST, "/file", file.File).Bind()
 
 	_r.Registered(GET, "/regex/:name", regex.Regex).Bind()
+
+	_r.Registered(GET, "/block", controller.Block).Bind()
+
+	//_r.Registered(GET, "/block2", controller.Block2).Bind()
 
 	//队列投递
 	_r.Registered(GET, "/task", queue.Task).Bind()

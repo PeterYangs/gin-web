@@ -1,34 +1,94 @@
 package controller
 
 import (
-	"fmt"
-	"gin-web/component/limiter"
 	"gin-web/contextPlus"
+	"gin-web/redis"
+	"gin-web/response"
 	"github.com/gin-gonic/gin"
 	"strconv"
+	"time"
 )
 
+//var m =make(map[string]string)
+
 // Index 主页
-func Index(c *contextPlus.Context) interface{} {
+func Index(c *contextPlus.Context) *response.Response {
 
-	//fmt.Println(c.Jj)
+	//申请一个锁，过期时间是10秒
+	lock := redis.GetClient().Lock("lock", 1*time.Second)
 
-	//fmt.Println(c.Get("test"))
+	defer lock.Release()
 
-	//panic("123")
+	//是否拿到锁
+	if lock.Get() {
 
-	return gin.H{"code": 1, "msg": "hello world"}
+		time.Sleep(4 * time.Second)
+
+		return response.Resp().Json(gin.H{"res": true})
+	}
+
+	return response.Resp().Json(gin.H{"res": false})
+
 }
 
-func Index2(c *contextPlus.Context) interface{} {
+func Block(c *contextPlus.Context) *response.Response {
 
-	fmt.Println(limiter.GlobalLimiters)
+	//申请一个锁，过期时间是10秒
+	lock := redis.GetClient().Lock("lock", 10*time.Second)
 
-	return gin.H{"code": 1, "msg": "hello world"}
+	defer lock.Release()
+
+	//最多等待5秒
+	if lock.Block(5 * time.Second) {
+
+		time.Sleep(100 * time.Millisecond)
+
+		return response.Resp().Json(gin.H{"res": true})
+
+	}
+
+	return response.Resp().Json(gin.H{"res": false})
+}
+
+//func Block2(c *contextPlus.Context) *response.Response {
+//
+//	//申请一个锁，过期时间是10秒
+//	lock := redis.GetClient().Lock("lock", 10*time.Second)
+//
+//	defer lock.Release()
+//
+//	//最多等待5秒
+//	if lock.Block(5 * time.Second) {
+//
+//		//time.Sleep(1 * time.Minute)
+//
+//		return response.Resp().Json(gin.H{"res": true})
+//
+//	}
+//
+//	return response.Resp().Json(gin.H{"res": false})
+//}
+
+func Index2(c *contextPlus.Context) *response.Response {
+
+	lock := redis.GetClient().Lock("lock", 1000*time.Second)
+
+	defer lock.Release()
+
+	if lock.Get() {
+
+		return response.Resp().Json(gin.H{"res": true})
+	}
+
+	//m["1"]="2"
+
+	return response.Resp().Json(gin.H{"res": false})
+
+	//return response.Resp().Json(gin.H{"code": 1, "msg": "hello world"})
 }
 
 // SessionSet 并发写入demo
-func SessionSet(c *contextPlus.Context) interface{} {
+func SessionSet(c *contextPlus.Context) *response.Response {
 
 	s := c.Session()
 
@@ -41,22 +101,22 @@ func SessionSet(c *contextPlus.Context) interface{} {
 		}(i, s)
 	}
 
-	return gin.H{"code": 1, "msg": "hello world"}
+	return response.Resp().Json(gin.H{"code": 1, "msg": "hello world"})
 }
 
-func Captcha(c *contextPlus.Context) interface{} {
+func Captcha(c *contextPlus.Context) *response.Response {
 
 	b := c.GetCaptcha()
 
 	c.Header("content-type", "image/png")
 
-	return b
+	return response.Resp().Byte(b)
 }
 
-func CheckCaptcha(c *contextPlus.Context) interface{} {
+func CheckCaptcha(c *contextPlus.Context) *response.Response {
 
 	code := c.Query("code")
 
-	return gin.H{"data": c.CheckCaptcha(code)}
+	return response.Resp().Json(gin.H{"bool": code})
 
 }

@@ -33,6 +33,10 @@ func init() {
 
 }
 
+type NullValue int
+
+const Null NullValue = 0x00000
+
 type Tag int
 
 const (
@@ -174,9 +178,11 @@ func (f *field) Default(value interface{}) *field {
 	return f
 }
 
-func (f *field) Comment(comment string) {
+func (f *field) Comment(comment string) *field {
 
 	f.comment = comment
+
+	return f
 
 }
 
@@ -245,8 +251,6 @@ func run(m *Migrate) {
 
 		if t.Error != nil {
 
-			//fmt.Println(t.Error)
-			//
 			fmt.Println(sql)
 
 			transaction.E = t.Error
@@ -263,9 +267,11 @@ func run(m *Migrate) {
 
 	if m.Tag == UPDATE {
 
+		fmt.Println("hi you")
+
 		sql := "alter table `" + m.Table + "` "
 
-		for _, f := range m.fields {
+		for i, f := range m.fields {
 
 			switch f.tag {
 
@@ -279,15 +285,33 @@ func run(m *Migrate) {
 
 			}
 
-			sql += ","
+			if i+1 < len(m.fields) {
+
+				sql += ","
+			}
 
 		}
 
-		sql = tools.SubStr(sql, 0, len(sql)-1)
+		//索引添加
+		for i, strings := range m.unique {
+
+			if len(m.fields) > 0 {
+
+				sql += ","
+			}
+
+			sql += " add UNIQUE  `" + tools.Join("+", strings) + "` (`" + tools.Join("`,`", strings) + "`)" + " USING BTREE"
+
+			if i+1 < len(m.unique) {
+
+				sql += ","
+			}
+
+		}
+
+		fmt.Println(sql)
 
 		t := database.GetDb().Exec(sql)
-
-		//fmt.Println(t.Error)
 
 		if t.Error != nil {
 
@@ -412,14 +436,14 @@ func setColumnAttr(f *field) string {
 		str += " unsigned "
 	}
 
-	if !f.isNullable && f.defaultValue != nil {
+	if !f.isNullable && f.defaultValue != Null {
 
 		str += " NOT NULL "
 	}
 
 	switch f.defaultValue.(type) {
 
-	case nil:
+	case NullValue:
 
 		str += " DEFAULT NULL "
 
