@@ -42,5 +42,6 @@ func _init(_r group) {
 
 	//队列投递
 	_r.Registered(GET, "/task", queue.Task).Bind()
+	_r.Registered(GET, "/task2", queue.Task2).Bind()
 
 }

@@ -4,18 +4,26 @@ import (
 	"gin-web/contextPlus"
 	"gin-web/queue"
 	"gin-web/queue/task/email"
-	"github.com/gin-gonic/gin"
+	"gin-web/queue/task/sms"
+	"gin-web/response"
 )
 
-func Task(c *contextPlus.Context) interface{} {
+func Task(c *contextPlus.Context) *response.Response {
 
-	//fmt.Println(limiter.GlobalLimiters)
+	for i := 0; i < 100; i++ {
 
-	//task,_:=json.Marshal(map[string]interface{}{"name":"email","data":"data"})
+		queue.Dispatch(email.NewTask("904801074@qq.com", "标题", "内容"))
+	}
 
-	//redis.GetClient().LPush(context.TODO(),"queue:default",task)
+	return response.Resp().String("gg")
+}
 
-	queue.Dispatch(email.NewTask("904801074@qq.com", "标题", "内容"))
+func Task2(c *contextPlus.Context) *response.Response {
 
-	return gin.H{"code": 1, "msg": "go"}
+	for i := 0; i < 100; i++ {
+
+		queue.Dispatch(sms.NewTask("110", "123"))
+	}
+
+	return response.Resp().String("gg")
 }

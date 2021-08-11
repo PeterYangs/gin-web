@@ -4,23 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gin-web/queue/task/email"
 	"gin-web/queue/taskName"
 	"gin-web/redis"
 	"github.com/spf13/cast"
 	"log"
 	"runtime/debug"
+	"sync"
 )
 
-type tasks struct {
-	task     taskName.Task     //处理器
-	taskName taskName.TaskName //任务名称
-}
-
-type data struct {
-	TaskName   string
-	Parameters map[string]string `json:"parameters"`
-}
+var handles = sync.Map{}
 
 func Run() {
 
@@ -33,15 +25,6 @@ func Run() {
 
 		}
 	}()
-
-	//t:=taskName.Task(email.TaskEmail{})
-
-	handles := map[string]tasks{
-		"email": tasks{
-			task:     &email.TaskEmail{Parameters: &email.Parameter{}},
-			taskName: email.Name,
-		},
-	}
 
 	for {
 
@@ -70,7 +53,10 @@ func Run() {
 		}
 
 		////获取task
-		h, ok := handles[jsons["TaskName"].(string)]
+		//h, ok := handles[jsons["TaskName"].(string)]
+		hh, ok := handles.Load(jsons["TaskName"].(string))
+
+		h := hh.(taskName.Task)
 
 		if !ok {
 
@@ -79,16 +65,19 @@ func Run() {
 			continue
 		}
 
-		h.task.BindParameters(cast.ToStringMapString(jsons["Parameters"]))
+		//绑定参数
+		h.BindParameters(cast.ToStringMapString(jsons["Parameters"]))
 
-		////执行任务
-		h.task.Run()
+		//执行任务
+		h.Run()
 
 	}
 
 }
 
-func Dispatch(task interface{}) {
+func Dispatch(task taskName.Task) {
+
+	handles.Store(task.GetName(), task)
 
 	t, _ := json.Marshal(task)
 

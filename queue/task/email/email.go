@@ -2,14 +2,13 @@ package email
 
 import (
 	"fmt"
-	"gin-web/queue/taskName"
 	"reflect"
 )
 
-const Name taskName.TaskName = "email"
+//const Name taskName.TaskName = "email"
 
 type TaskEmail struct {
-	TaskName   taskName.TaskName //处理器名称
+	TaskName   string //处理器名称
 	Parameters *Parameter
 }
 
@@ -27,7 +26,7 @@ func NewTask(email string, title string, content string) *TaskEmail {
 			Title:   title,
 			Content: content,
 		},
-		TaskName: Name,
+		TaskName: "email",
 	}
 }
 
@@ -35,6 +34,11 @@ func (t *TaskEmail) Run() {
 
 	fmt.Println(t.Parameters.Email, t.Parameters.Title, t.Parameters.Content)
 
+}
+
+func (t *TaskEmail) GetName() string {
+
+	return t.TaskName
 }
 
 func (t *TaskEmail) BindParameters(p map[string]string) {

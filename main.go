@@ -44,6 +44,7 @@ func main() {
 	//	endless.ListenAndServe(":"+port, r)
 	//}
 
+	//启动消息队列
 	go queue.Run()
 
 	//windows只做开发测试
